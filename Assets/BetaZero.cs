@@ -48,13 +48,8 @@ public class BetaZero : MonoBehaviour
     }
 }
 
-public class Helpers
+public static class Helpers
 {
-    int boardSize = 8;
-    public Helpers(int boardSize)
-    {
-        this.boardSize = boardSize;
-    }
 
     public struct LabeledData
     {
@@ -67,7 +62,7 @@ public class Helpers
         }
     }
 
-    public int[,] FlipBoard(int[,] Board, int boardSize)
+    public static int[,] FlipBoard(int[,] Board, int boardSize)
     {
         int[,] newBoard = new int[boardSize, boardSize];
         for (int i = 0; i < boardSize; i++)
@@ -88,7 +83,7 @@ public class Helpers
        new Vector2(-1, 1),  new Vector2(0, 1),  new Vector2(1, 1)   // Down-left, Down, Down-right
    };
 
-    public int[,] ResetBoard(int boardSize)
+    public static int[,] ResetBoard(int boardSize)
     {
         int[,] Output = new int[boardSize, boardSize];
         for (int i = 0; i < boardSize; i++)
@@ -106,7 +101,7 @@ public class Helpers
         return Output;
     }
 
-    public bool IsValidMove(int[,] gameState, Vector2 move, int myPiece)
+    public static bool IsValidMove(int[,] gameState, Vector2 move, int myPiece, int boardSize)
     {
         int opponent = -myPiece; // Opponent's piece (-1 if myPiece is 1, vice versa)
 
@@ -150,23 +145,23 @@ public class Helpers
         return false; // No valid flipping found
     }
 
-    public float Sigmoid(float x)
+    public static float Sigmoid(float x)
     {
         return 1 / 1 + Mathf.Exp(-x);
     }
 
-    public float D_Sigmoid(float x)
+    public static float D_Sigmoid(float x)
     {
         float y = Sigmoid(x) * (1 - Sigmoid(x));
         return y;
     }
 
-    public float CostFunction(float OUTPUT, float y)
+    public static float CostFunction(float OUTPUT, float y)
     {
         return (y - OUTPUT) * (y - OUTPUT);
     }
 
-    public float OverhaulCost(float[] OUTPUT, float[] y)
+    public static float OverhaulCost(float[] OUTPUT, float[] y)
     {
         float Cost = 0;
         for (int i = 0; i < OUTPUT.Length; i++)
@@ -176,13 +171,13 @@ public class Helpers
         return Cost;
     }
 
-    public void MakeMiniBatch(int Size)
+    public static void MakeMiniBatch(int Size)
     {
 
 
     }
 
-    public int Round(float x)
+    public static int Round(float x)
     {
         if (x - (int)x < 0.5f)
         {
@@ -191,7 +186,7 @@ public class Helpers
         return ((int)x + 1);
     }
 
-    public int[,] MakeMove(int[,] gameState, Vector2 move, Vector2[] Directions, int boardSize)
+    public static int[,] MakeMove(int[,] gameState, Vector2 move, Vector2[] Directions, int boardSize)
     {
         int[,] Output = gameState;
         int x = (int)move.x;
@@ -238,7 +233,7 @@ public class Helpers
         return Output;
     }
 
-    public int GameTerminatet(int[,] gameState, int boardSize)
+    public static int GameTerminatet(int[,] gameState, int boardSize)
     {
         int x = 0;
         int y = 0;
@@ -287,7 +282,7 @@ public class Helpers
         {
             for (int j = 0; j < boardSize; j++)
             {
-                if (IsValidMove(gameState, new Vector2(i, j), 1)) // the gameState will be masked so that 1 is the player how needs to move, no matter if he plays black or white
+                if (IsValidMove(gameState, new Vector2(i, j), 1, boardSize)) // the gameState will be masked so that 1 is the player how needs to move, no matter if he plays black or white
                 {
                     w++;
                 }
@@ -304,7 +299,7 @@ public class Helpers
         //2 = draw
     }
 
-    public int[,] ExtractSlice(int[,][] Array, int n, int Size)
+    public static int[,] ExtractSlice(int[,][] Array, int n, int Size)
     {
         int[,] newArray = null;
         for (int i = 0; i < Size; i++)
@@ -317,7 +312,7 @@ public class Helpers
         return newArray;
     }
 
-    public int[,][] PrintSlice(int[,][] Array, int[,] Slice, int n, int Size)
+    public static int[,][] PrintSlice(int[,][] Array, int[,] Slice, int n, int Size)
     {
         int[,][] newArray = Array;
         for (int i = 0; i < Size; i++)
@@ -330,7 +325,7 @@ public class Helpers
         return newArray;
     }
 
-    public Vector2[] PossibleMoves(int[,] gameState)
+    public static Vector2[] PossibleMoves(int[,] gameState, int boardSize)
     {
         Vector2[] possMoves = new Vector2[boardSize * boardSize];
         int x = 0;
@@ -338,7 +333,7 @@ public class Helpers
         {
             for (int j = 0; j < boardSize; j++)
             {
-                if (IsValidMove(gameState, new Vector2(i, j), 1))
+                if (IsValidMove(gameState, new Vector2(i, j), 1, boardSize))
                 {
                     possMoves[x] = new Vector2(i, j);
                 }
@@ -347,7 +342,7 @@ public class Helpers
         return possMoves;
     }
 
-    public float UpdatingMethode(int UpdMeth, float x, float D_x, float cost, float SpecificCoefficient, float LearningCoefficient)
+    public static float UpdatingMethode(int UpdMeth, float x, float D_x, float cost, float SpecificCoefficient, float LearningCoefficient)
     {
         if (UpdMeth == 1)
         {
@@ -363,19 +358,19 @@ public class Helpers
         }
     }
 
-    public float StepwiseUpdating(float x, float D_x, float cost, float SpecificCoefficient, float LearningCoefficient)
+    public static float StepwiseUpdating(float x, float D_x, float cost, float SpecificCoefficient, float LearningCoefficient)
     {
         float y = x - (LearningCoefficient * SpecificCoefficient * D_x);
         return y;
     }
 
-    public float NewtonUpdating(float x, float D_x, float cost, float SpecificCoefficient, float LearningCoefficient)
+    public static float NewtonUpdating(float x, float D_x, float cost, float SpecificCoefficient, float LearningCoefficient)
     {
         float y = x - (LearningCoefficient * SpecificCoefficient * cost / D_x);
         return y;
     }
 
-    public float InverseNewtonUpdating(float x, float D_x, float cost, float SpecificCoefficient, float LearningCoefficient)
+    public static float InverseNewtonUpdating(float x, float D_x, float cost, float SpecificCoefficient, float LearningCoefficient)
     {
         float y = x - (LearningCoefficient * SpecificCoefficient * cost * D_x);
         return y;
@@ -459,6 +454,7 @@ public class AIPlayer
     public int GamesPlayed = 0;
     public int lookAheadDeapth = 2;
     public int lookAheadDeapth2 = 2;
+
 
     public int[] SetupNetworkInput(int[,] GameState)
     {
