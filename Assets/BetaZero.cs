@@ -2,49 +2,90 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using System.Runtime.InteropServices;
+using UnityEngine.UIElements;
 
 
 public class BetaZero : MonoBehaviour
 {
 
+    public int[,] Game;
+    public int boardSize = 8;
+
+
+    public int MiniBatchSize;
+    public float LearningCoefficient;
+    public float WeigthCoefficiant;
+    public float BiasCoefficiant;
+    public int SquishMeth;
+    public int UpdMeth; // 1 = Normal, 2 = Newton, 3 = InverseNewton
+
+    public int[,] testGameState = new int[,] { { -1, 1, 1, 0, 0, 0, 0, -1},
+                                               { 0, 0, 0, 0, 0, 0, 0, 0},
+                                               { 0, 1, 0, 0, 0, 0, 0, 0},
+                                               { 0, 0, 0, -1, 1, 0, 0, 0},
+                                               { 0, 0, 0, 1, -1, 0, 0, 0},
+                                               { 0, 0, 0, 0, 0, 0, 0, 0},
+                                               { 0, -1, 0, 0, 0, 0, 0, 0},
+                                               { 0, 0, 0, 0, 0, 0, 0, 1 } };
+
+    #region Visual Variables
+    public GameObject TilePrefab;
+    public GameObject PiecePrefab;
+    public int tileSize = 1;
+
+    public Color whiteColor = Color.white;
+    public Color blackColor = Color.black;
+
+    public Color BoardWhiteColor;
+    public Color BoardBlackColor;
+
+    public GameObject TileParent;
+    public GameObject PieceParent;
+    #endregion
+
 
     void Start()
     {
-
+        AIPlayer AIPlayer1 = new AIPlayer(boardSize, new int[] { 65, 16, 16, 16, 1 }, 100, 1, 1, 1, 1, 1);
+        AIPlayer AIPlayer2 = new AIPlayer(boardSize, new int[] { 65, 16, 16, 16, 1 }, 100, 1, 1, 1, 1, 1);
+        VisualizeBoard Board = new VisualizeBoard(TilePrefab, PiecePrefab, boardSize, tileSize, BoardWhiteColor, BoardBlackColor, whiteColor, blackColor, TileParent, PieceParent);
+        Board.SetupBoard();
+        Board.RenderPieces(testGameState);
     }
 
-    void playGames()
-    {
-        for (int g = 0; g < MiniBatchSize; g++)
-        {
-            Game = ResetBoard(boardSize);
-            int p = Random.Range(-1, 1);
-            while (true)
-            {
-                if (p == 1)
-                {
-                    Game = CalcNextMove(Game);
-                }
-                else
-                {
+    //void playGames()
+    //{
+    //    for (int g = 0; g < MiniBatchSize; g++)
+    //    {
+    //        Game = Helpers.ResetBoard(boardSize);
+    //        int p = Random.Range(-1, 1);
+    //        while (true)
+    //        {
+    //            if (p == 1)
+    //            {
+    //                Game = Helpers.CalcNextMove(Game);
+    //            }
+    //            else
+    //            {
+    //
+    //
+    //            }
+    //
+    //
+    //
+    //
+    //            p *= -1;
+    //            Game = Helpers.FlipBoard(Game);
+    //        }
+    //    }
+    //}
 
 
-                }
-
-
-
-
-                p *= -1;
-                Game = FlipBoard(Game);
-            }
-        }
-    }
-
-
-    // Update is called once per frame
+   // Update is called once per frame
     void Update()
     {
-
+        
     }
 }
 
@@ -161,7 +202,7 @@ public static class Helpers
         return (y - OUTPUT) * (y - OUTPUT);
     }
 
-    public static float OverhaulCost(float[] OUTPUT, float[] y)
+    public static float OverallCost(float[] OUTPUT, float[] y)
     {
         float Cost = 0;
         for (int i = 0; i < OUTPUT.Length; i++)
@@ -282,7 +323,7 @@ public static class Helpers
         {
             for (int j = 0; j < boardSize; j++)
             {
-                if (IsValidMove(gameState, new Vector2(i, j), 1, boardSize)) // the gameState will be masked so that 1 is the player how needs to move, no matter if he plays black or white
+                if (IsValidMove(gameState, new Vector2(i, j), 1, boardSize)) 
                 {
                     w++;
                 }
@@ -375,11 +416,116 @@ public static class Helpers
         float y = x - (LearningCoefficient * SpecificCoefficient * cost * D_x);
         return y;
     }
+    public static void DeleteChildren(GameObject Parent)
+    {
+        foreach (Transform child in Parent.transform)
+        {
+            Object.DestroyImmediate(child);
+        }
+    }
+}
+
+public class VisualizeBoard
+{
+    public GameObject TilePrefab;
+    public GameObject PiecePrefab;
+    public int boardSize;
+    public Vector2 startPoint = new Vector2(0, 0);
+    private GameObject[,] Tiles;
+    private GameObject[,] Pieces;
+    public int tileSize = 1;
+
+    public Color BoardWhiteColor;
+    public Color BoardBlackColor;
+
+    public Color whiteColor;
+    public Color blackColor;
+
+    private GameObject TileParent;
+    private GameObject PieceParent;
+
+    public VisualizeBoard(GameObject tilePrefab, GameObject piecePrefab,  int boardSize, int tileSize, Color BoardWhite, Color BoardBlack, Color whiteColor, Color blackColor, GameObject TileParent, GameObject PieceParent)
+    {
+        TilePrefab = tilePrefab;  //ahhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh
+        PiecePrefab = piecePrefab;
+        this.boardSize = boardSize;
+        this.startPoint = new Vector2(-(boardSize / 2 * tileSize) + 0.5f, -(boardSize / 2 * tileSize) + 0.5f);
+        this.tileSize = tileSize;
+        this.BoardWhiteColor = BoardWhite;
+        this.BoardBlackColor = BoardBlack;
+        this.whiteColor = whiteColor;
+        this.blackColor = blackColor;
+        this.PieceParent = PieceParent;
+        this.TileParent = TileParent;
+    }
+
+    public void SetupBoard()
+    {
+        Tiles = new GameObject[boardSize, boardSize];
+        Vector2 position = startPoint;
+        for (int i = 0; i < boardSize; i++)
+        {
+            for (int j = 0; j < boardSize; j++)
+            {
+                position = startPoint + new Vector2(i * tileSize, j * tileSize);
+                if (i % 2 ==j % 2)
+                {
+                    TilePrefab.GetComponent<SpriteRenderer>().color = BoardWhiteColor;
+                }
+                else
+                {
+                    TilePrefab.GetComponent<SpriteRenderer>().color = BoardBlackColor;
+                }
+                Tiles[i, j] = GameObject.Instantiate(TilePrefab, position, Quaternion.identity);
+                Tiles[i, j].transform.SetParent(TileParent.transform);
+                Tiles[i, j].transform.name = "Tile" + (i * 8 + j + 1);
+                
+            }
+        }
+    }
+
+    public void RenderPieces(int[,] gameState)
+    {
+        Pieces = new GameObject[boardSize, boardSize];
+        Vector2 position = startPoint;
+        for (int i = 0; i < boardSize; i++)
+        {
+            for (int j = 0; j < boardSize; j++)
+            {
+                if (gameState[i, j] != 0)
+                {
+                    position = startPoint + new Vector2(i * tileSize, j * tileSize);
+
+                    if (gameState[i, j] == 1)
+                    {
+                        PiecePrefab.GetComponent<SpriteRenderer>().color = whiteColor;
+                    }
+                    else
+                    {
+                        PiecePrefab.GetComponent<SpriteRenderer>().color = blackColor;
+                    }
+                    Pieces[i, j] = GameObject.Instantiate(PiecePrefab, position, Quaternion.identity);
+                    Pieces[i, j].transform.SetParent(PieceParent.transform);
+                    Pieces[i, j].transform.name = "Piece" + (i * 8 + j + 1);
+                }
+            }
+        }
+    }
+ 
+    public void DeleteBoard()
+    {
+        Helpers.DeleteChildren(TileParent);
+    }
+
+    public void RestBoard()
+    {
+        Helpers.DeleteChildren(PieceParent);
+    }
 }
 
 public class AIPlayer
 {
-
+    #region Variable Declarations and setup
     public struct LabeledData
     {
         public float[] Data;
@@ -392,29 +538,23 @@ public class AIPlayer
     }
 
     //Reversi Bot
-    public int[] Layers = { 65, 16, 16, 16, 1 };
+    public int[] Layers;
     private float[,] Neuron; // Layer, Neuron
     private float[,] Bias;
     private float[,,] Weight; // Layer, Neuron, prev Neuron
     private float[,] z;
 
-    public int[] Layers2 = { 123, 16, 16, 16, 1 };
-    private float[,] Neuron2; // Layer, Neuron
-    private float[,] Bias2;
-    private float[,,] Weight2; // Layer, Neuron, prev Neuron
-    private float[,] z2;
-
 
     public int[,] Game;
-    public int boardSize = 8;
+    public int boardSize;
 
 
-    public int MiniBatchSize = 100;
-    public float LearningCoefficient = 1;
-    public float WeigthCoefficiant = 1;
-    public float BiasCoefficiant = 1;
+    public int MiniBatchSize;
+    public float LearningCoefficient;
+    public float WeigthCoefficiant;
+    public float BiasCoefficiant;
     public int SquishMeth;
-    public int UpdMeth = 1; // 1 = Normal, 2 = Newton, 3 = InverseNewton
+    public int UpdMeth; // 1 = Normal, 2 = Newton, 3 = InverseNewton
 
 
     private float[,] D_A;
@@ -449,11 +589,19 @@ public class AIPlayer
 
     private int[,][] CurrentRecordedGame;
     private int[,][][] CurrentMiniBatchGameRecording;
+    #endregion
 
-
-    public int GamesPlayed = 0;
-    public int lookAheadDeapth = 2;
-    public int lookAheadDeapth2 = 2;
+    public AIPlayer(int boardSize, int[] Layers, int MiniBatchSize, float LearningCoefficient, float WeigthCoefficiant, float BiasCoefficiant, int SquishMeth, int UpdMeth)
+    {
+        this.boardSize = boardSize;
+        this.Layers = Layers;
+        this.MiniBatchSize = MiniBatchSize;
+        this.LearningCoefficient = LearningCoefficient;
+        this.WeigthCoefficiant = WeigthCoefficiant;
+        this.BiasCoefficiant = BiasCoefficiant;
+        this.SquishMeth = SquishMeth;  //not implemented yet
+        this.UpdMeth = UpdMeth;
+    }
 
 
     public int[] SetupNetworkInput(int[,] GameState)
@@ -462,7 +610,6 @@ public class AIPlayer
         Input = GameState.Cast<int>().ToArray();
         return Input;
     }
-
 
     void NN(float[] Input)
     {
@@ -480,7 +627,7 @@ public class AIPlayer
                     z[i, k] += Weight[i, j, k] * Neuron[i - 1, k];
                 }
                 z[i, j] += Bias[i, j];
-                Neuron[i, j] = Sigmoid(z[i, j]);
+                Neuron[i, j] = Helpers.Sigmoid(z[i, j]);
             }
         }
     }
@@ -488,7 +635,7 @@ public class AIPlayer
 
     int ActF(float x)
     {
-        int y = Round(x);
+        int y = Helpers.Round(x);
         if (y < -1)
         {
             y = -1;
@@ -525,7 +672,7 @@ public class AIPlayer
         {
             Output[i] = Neuron[Layers.Length - 1, i];
         }
-        Cost = OverhaulCost(Output, CurrentExample.Label);
+        Cost = Helpers.OverallCost(Output, CurrentExample.Label);
         for (int i = 0; i < Layers[Layers.Length - 1]; i++) // Last Row D_Activation
         {
             D_A[Layers.Length - 1, i] = 2 * (Output[i] - CurrentExample.Label[i]);
@@ -534,7 +681,7 @@ public class AIPlayer
         {
             for (int j = 0; j < Layers[i]; j++)
             {
-                D_Z[i, j] = D_Sigmoid(z[i, j]) * D_A[i, j]; // Compute derivative of z in respect to the Cost
+                D_Z[i, j] = Helpers.D_Sigmoid(z[i, j]) * D_A[i, j]; // Compute derivative of z in respect to the Cost
                 D_B[i, j] = D_Z[i, j];  // Compute derivative of the Bias in respect to the Cost
                 for (int k = 0; k < Layers[i - 1]; k++)
                 {
@@ -554,7 +701,7 @@ public class AIPlayer
 
     void FeedTrainingExamples()
     {
-        MakeMiniBatch(MiniBatchSize);
+        Helpers.MakeMiniBatch(MiniBatchSize);
         for (int h = 0; h < MiniBatchSize; h++)
         {
             NN(MiniBatch[h].Data);
@@ -599,8 +746,6 @@ public class AIPlayer
     }
 
 
-
-
     void AdjustNeuralNetwork()
     {
         for (int i = Layers.Length - 1; i > -1; i--)  // Step back threw Layers
@@ -613,38 +758,6 @@ public class AIPlayer
                     Weight[i, j, k] = Helpers.UpdatingMethode(UpdMeth, Weight[i, j, k], A_D_W[i, j, k], A_Cost, WeigthCoefficiant, LearningCoefficient);
                 }
             }
-        }
-    }
-}
-
-public class BetaZeroTrainer : MonoBehaviour
-{
-    public BetaZero betaZero;
-    public int TrainingCycles = 1000;
-    public int GamesPerCycle = 100;
-    public int CyclesPerAdjustment = 10;
-    private int currentCycle = 0;
-    void Start()
-    {
-        betaZero.SetupNN();
-        betaZero.SetupNN2();
-        StartCoroutine(Train());
-    }
-    IEnumerator Train()
-    {
-        while (currentCycle < TrainingCycles)
-        {
-            for (int i = 0; i < GamesPerCycle; i++)
-            {
-                betaZero.playGames();
-            }
-            if (currentCycle % CyclesPerAdjustment == 0)
-            {
-                betaZero.FeedTrainingExamples();
-                betaZero.AdjustNeuralNetwork();
-            }
-            currentCycle++;
-            yield return null; // Wait for the next frame
         }
     }
 }
