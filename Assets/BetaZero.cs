@@ -4,6 +4,9 @@ using UnityEngine;
 using System.Linq;
 using System.Runtime.InteropServices;
 using UnityEngine.UIElements;
+using UnityEngine.Assertions.Must;
+using System;
+using static UnityEditor.Experimental.GraphView.GraphView;
 
 
 public class BetaZero : MonoBehaviour
@@ -20,14 +23,12 @@ public class BetaZero : MonoBehaviour
     public int SquishMeth;
     public int UpdMeth; // 1 = Normal, 2 = Newton, 3 = InverseNewton
 
-    public int[,] testGameState = new int[,] { { -1, 1, 1, 0, 0, 0, 0, -1},
-                                               { 0, 0, 0, 0, 0, 0, 0, 0},
-                                               { 0, 1, 0, 0, 0, 0, 0, 0},
-                                               { 0, 0, 0, -1, 1, 0, 0, 0},
-                                               { 0, 0, 0, 1, -1, 0, 0, 0},
-                                               { 0, 0, 0, 0, 0, 0, 0, 0},
-                                               { 0, -1, 0, 0, 0, 0, 0, 0},
-                                               { 0, 0, 0, 0, 0, 0, 0, 1 } };
+    public static int MaxGameLength = 10;
+
+    AIPlayer aiPlayer1;
+    AIPlayer aiPlayer2;
+    VisualizeBoard board;
+
 
     #region Visual Variables
     public GameObject TilePrefab;
@@ -46,46 +47,128 @@ public class BetaZero : MonoBehaviour
 
 
     void Start()
-    {
-        AIPlayer AIPlayer1 = new AIPlayer(boardSize, new int[] { 65, 16, 16, 16, 1 }, 100, 1, 1, 1, 1, 1);
-        AIPlayer AIPlayer2 = new AIPlayer(boardSize, new int[] { 65, 16, 16, 16, 1 }, 100, 1, 1, 1, 1, 1);
-        VisualizeBoard Board = new VisualizeBoard(TilePrefab, PiecePrefab, boardSize, tileSize, BoardWhiteColor, BoardBlackColor, whiteColor, blackColor, TileParent, PieceParent);
-        Board.SetupBoard();
-        Board.RenderPieces(testGameState);
+    { 
+        aiPlayer1 = new AIPlayer(boardSize, new int[] { 64, 16, 16, 16, 1 }, 100, 1, 1, 1, 1, 1);
+        aiPlayer2 = new AIPlayer(boardSize, new int[] { 64, 16, 16, 16, 1 }, 100, 1, 1, 1, 1, 1);
+        aiPlayer1.InitializeNetwork();
+        aiPlayer2.InitializeNetwork();
+        aiPlayer1.SetupNN();
+        aiPlayer2.SetupNN();
+        board = new VisualizeBoard(TilePrefab, PiecePrefab, boardSize, tileSize, BoardWhiteColor, BoardBlackColor, whiteColor, blackColor, TileParent, PieceParent);
+        board.SetupBoard();
+        //Test(board, aiPlayer1, aiPlayer2); ~
+        playGames(board, aiPlayer1, aiPlayer2);
     }
 
-    //void playGames()
-    //{
-    //    for (int g = 0; g < MiniBatchSize; g++)
-    //    {
-    //        Game = Helpers.ResetBoard(boardSize);
-    //        int p = Random.Range(-1, 1);
-    //        while (true)
-    //        {
-    //            if (p == 1)
-    //            {
-    //                Game = Helpers.CalcNextMove(Game);
-    //            }
-    //            else
-    //            {
-    //
-    //
-    //            }
-    //
-    //
-    //
-    //
-    //            p *= -1;
-    //            Game = Helpers.FlipBoard(Game);
-    //        }
-    //    }
-    //}
+    void InitializeVariables()
+    {
 
+    }
 
-   // Update is called once per frame
+    void Test(VisualizeBoard board, AIPlayer aiPlayer1, AIPlayer aiPlayer2)
+    {
+        board.ResetBoard();
+        Game = Helpers.ResetBoard(boardSize);
+        board.RenderPieces(Game);
+        Vector2[] PossibleMoves = Helpers.PossibleMoves(Game, boardSize);
+        float[] scores = new float[(int)PossibleMoves[0].x];
+        for (int i = 1; i <= PossibleMoves[0].x; i++) //loop threw moves
+        {
+            Debug.Log(i);
+            Debug.Log(PossibleMoves[i]);
+            int[,] newGamestate = Helpers.MakeMove(Game, PossibleMoves[i], boardSize);
+            float[] Input = aiPlayer1.SetupNetworkInput(newGamestate);
+            aiPlayer1.NN(Input); 
+            scores[i - 1] = aiPlayer1.GetOutput();
+            Debug.Log(scores[i - 1]);
+            board.RenderPieces(newGamestate);
+        }
+        Game = Helpers.MakeMove(Game, PossibleMoves[Array.IndexOf(scores, scores.Max())], boardSize);
+    }
+
+    void playGames(VisualizeBoard board, AIPlayer aiPlayer1, AIPlayer aiPlayer2)
+    {
+        for (int g = 0; g < MiniBatchSize; g++)
+        {
+            board.ResetBoard();
+            Game = Helpers.ResetBoard(boardSize);
+            board.RenderPieces(Game);
+
+            int p = 1; // UnityEngine.Random.Range(0, 2); //for debugging always star with p1 normally random ~
+            if (p == 0)
+            {
+                p = -1;
+            }
+            for (int r = 0; r < MaxGameLength; r++)
+            {
+                board.ResetBoard();
+                board.RenderPieces(Game); //nur rendering ~
+                Vector2[] PossibleMoves = Helpers.PossibleMoves(Game, boardSize);
+                float[] scores = new float[(int)PossibleMoves[0].x];
+                //for (int i = 0; i < PossibleMoves.Length; i++)
+                //{
+                //    print(PossibleMoves[i]);
+                //}
+                if (p == 1)
+                {
+                    for (int i = 1; i <= PossibleMoves[0].x; i++) //loop threw moves
+                    {
+                        int[,] newGamestate = Helpers.MakeMove(Game, PossibleMoves[i], boardSize);
+                        float[] Input = aiPlayer1.SetupNetworkInput(newGamestate);
+                        aiPlayer1.NN(Input);
+                        scores[i - 1] = aiPlayer1.GetOutput();
+                        board.RenderPieces(newGamestate);
+                    }
+                    print("Scores:");
+                    for (int i = 0; i < scores.Length; i++)
+                    {
+                        print(scores[i]);
+                    }
+                    print("Max score:");
+                    print(scores.Max());
+                    print("index:");
+                    print(Array.IndexOf(scores, scores.Max()));
+                    print("Move:");
+                    print(PossibleMoves[Array.IndexOf(scores, scores.Max())]);
+                    Game = Helpers.MakeMove(Game, PossibleMoves[Array.IndexOf(scores, scores.Max())], boardSize);
+                }
+                //else
+                //{
+                //    for (int i = 1; i <= PossibleMoves[0].x; i++) //loop threw moves
+                //    {
+                //        int[,] newGamestate = Helpers.MakeMove(Game, PossibleMoves[i], boardSize);
+                //        float[] Input = aiPlayer2.SetupNetworkInput(newGamestate);
+                //        aiPlayer2.NN(Input);
+                //        scores[i - 1] = aiPlayer2.GetOutput();
+                //    }
+                //    print("Scores:");
+                //    print(scores);
+                //    Game = Helpers.MakeMove(Game, PossibleMoves[Array.IndexOf(scores, scores.Max())], boardSize);
+                //}
+                //if (Helpers.GameTerminatet(Game, boardSize) == 1)
+                //{
+                //    if (p == 1)
+                //    {
+                //
+                //    }
+                //    break;
+                //}
+                //p *= -1;
+                //Game = Helpers.FlipBoard(Game, boardSize);
+                ////Todo: Make Game recording and distribute it
+                break;
+            }
+            break;
+
+        }
+        board.ResetBoard();
+        board.RenderPieces(Game); //nur rendering ~
+    }
+
+    // Update is called once per frame
     void Update()
     {
-        
+        //playGames(board, aiPlayer1, aiPlayer2);
     }
 }
 
@@ -122,7 +205,9 @@ public static class Helpers
        new Vector2(-1, -1), new Vector2(0, -1), new Vector2(1, -1), // Up-left, Up, Up-right
        new Vector2(-1, 0),  new Vector2(1, 0),                      // Left, Right
        new Vector2(-1, 1),  new Vector2(0, 1),  new Vector2(1, 1)   // Down-left, Down, Down-right
-   };
+    };
+
+
 
     public static int[,] ResetBoard(int boardSize)
     {
@@ -142,10 +227,10 @@ public static class Helpers
         return Output;
     }
 
-    public static bool IsValidMove(int[,] gameState, Vector2 move, int myPiece, int boardSize)
+    public static bool IsValidMove(int[,] gameState, Vector2 move, int boardSize)
     {
-        int opponent = -myPiece; // Opponent's piece (-1 if myPiece is 1, vice versa)
-
+        int opponent = -1;
+        int myPiece = 1;
 
         int x = (int)move.x;
         int y = (int)move.y;
@@ -153,7 +238,9 @@ public static class Helpers
 
         // Move must be inside bounds and on an empty space
         if (x < 0 || x >= boardSize || y < 0 || y >= boardSize || gameState[x, y] != 0)
+        {
             return false;
+        }
 
 
         // Check all 8 directions
@@ -188,13 +275,14 @@ public static class Helpers
 
     public static float Sigmoid(float x)
     {
-        return 1 / 1 + Mathf.Exp(-x);
+        return x;
+        //return 2f *(1f / (1f + Mathf.Exp(-x))) - 1;
     }
 
     public static float D_Sigmoid(float x)
     {
-        float y = Sigmoid(x) * (1 - Sigmoid(x));
-        return y;
+        float y = Sigmoid(x);
+        return 2*(y * (1f -y));
     }
 
     public static float CostFunction(float OUTPUT, float y)
@@ -215,7 +303,6 @@ public static class Helpers
     public static void MakeMiniBatch(int Size)
     {
 
-
     }
 
     public static int Round(float x)
@@ -227,7 +314,7 @@ public static class Helpers
         return ((int)x + 1);
     }
 
-    public static int[,] MakeMove(int[,] gameState, Vector2 move, Vector2[] Directions, int boardSize)
+    public static int[,] MakeMove(int[,] gameState, Vector2 move, int boardSize)
     {
         int[,] Output = gameState;
         int x = (int)move.x;
@@ -323,7 +410,7 @@ public static class Helpers
         {
             for (int j = 0; j < boardSize; j++)
             {
-                if (IsValidMove(gameState, new Vector2(i, j), 1, boardSize)) 
+                if (IsValidMove(gameState, new Vector2(i, j), boardSize)) 
                 {
                     w++;
                 }
@@ -366,6 +453,16 @@ public static class Helpers
         return newArray;
     }
 
+    public static float[] ExtractSlice1D(float[,] Array, int Layer, int LayerSize)
+    {
+        float[] newArray = new float[LayerSize];
+        for (int i = 0; i < LayerSize; i++)
+        {
+            newArray[i] = Array[Layer, i];
+        }
+        return newArray;
+    }
+
     public static Vector2[] PossibleMoves(int[,] gameState, int boardSize)
     {
         Vector2[] possMoves = new Vector2[boardSize * boardSize];
@@ -374,12 +471,14 @@ public static class Helpers
         {
             for (int j = 0; j < boardSize; j++)
             {
-                if (IsValidMove(gameState, new Vector2(i, j), 1, boardSize))
+                if (IsValidMove(gameState, new Vector2(i, j), boardSize))
                 {
-                    possMoves[x] = new Vector2(i, j);
+                    possMoves[x + 1] = new Vector2(i, j);
+                    x++;
                 }
             }
         }
+        possMoves[0] = new Vector2(x, 0); //indicates how many possible moves there are
         return possMoves;
     }
 
@@ -418,9 +517,16 @@ public static class Helpers
     }
     public static void DeleteChildren(GameObject Parent)
     {
-        foreach (Transform child in Parent.transform)
+        var children = new List<GameObject>();
+
+        foreach (Transform child in Parent.transform) //geht irgendwie nicht leichter
         {
-            Object.DestroyImmediate(child);
+            children.Add(child.gameObject);
+        }
+
+        foreach (GameObject child in children)
+        {
+            UnityEngine.Object.Destroy(child);
         }
     }
 }
@@ -517,8 +623,9 @@ public class VisualizeBoard
         Helpers.DeleteChildren(TileParent);
     }
 
-    public void RestBoard()
+    public void ResetBoard()
     {
+        
         Helpers.DeleteChildren(PieceParent);
     }
 }
@@ -539,10 +646,10 @@ public class AIPlayer
 
     //Reversi Bot
     public int[] Layers;
-    private float[,] Neuron; // Layer, Neuron
-    private float[,] Bias;
-    private float[,,] Weight; // Layer, Neuron, prev Neuron
-    private float[,] z;
+    public float[,] Neuron; // Layer, Neuron
+    public float[,] Bias;
+    public float[,,] Weight; // Layer, Neuron, prev Neuron
+    public float[,] z;
 
 
     public int[,] Game;
@@ -583,12 +690,10 @@ public class AIPlayer
     private LabeledData CurrentData;
 
 
-    public float[] INPUT;
-    public float[] OUTPUT;
 
 
-    private int[,][] CurrentRecordedGame;
-    private int[,][][] CurrentMiniBatchGameRecording;
+    public int[,][] CurrentRecordedGame;
+    public int[,][][] CurrentMiniBatchGameRecording;
     #endregion
 
     public AIPlayer(int boardSize, int[] Layers, int MiniBatchSize, float LearningCoefficient, float WeigthCoefficiant, float BiasCoefficiant, int SquishMeth, int UpdMeth)
@@ -599,20 +704,57 @@ public class AIPlayer
         this.LearningCoefficient = LearningCoefficient;
         this.WeigthCoefficiant = WeigthCoefficiant;
         this.BiasCoefficiant = BiasCoefficiant;
-        this.SquishMeth = SquishMeth;  //not implemented yet
+        this.SquishMeth = SquishMeth;  //not implemented yet ~
         this.UpdMeth = UpdMeth;
+        this.Layers[Layers.Length - 1] = 1;
     }
 
 
-    public int[] SetupNetworkInput(int[,] GameState)
+    public void InitializeNetwork()
     {
-        int[] Input = new int[boardSize * boardSize];
-        Input = GameState.Cast<int>().ToArray();
-        return Input;
+        Neuron = new float[Layers.Length, Layers.Max()]; // Layer, Neuron
+        Bias = new float[Layers.Length, Layers.Max()];
+        Weight = new float[Layers.Length, Layers.Max(), Layers.Max()]; // Layer, Neuron, prev Neuron
+        z = new float[Layers.Length, Layers.Max()]; //could be one Layer less romve later ~
+
+
+        D_A = new float[Layers.Length, Layers.Max()];
+        D_Z = new float[Layers.Length, Layers.Max()];
+        D_B = new float[Layers.Length, Layers.Max()];
+        D_W = new float[Layers.Length, Layers.Max(), Layers.Max()];
+
+
+        L_D_A = new float[Layers.Length, Layers.Max()][];  // List of differencials for different training examples
+        L_D_Z = new float[Layers.Length, Layers.Max()][];
+        L_D_B = new float[Layers.Length, Layers.Max()][];
+        L_D_W = new float[Layers.Length, Layers.Max(), Layers.Max()][];
+        L_Cost = new float[MiniBatchSize];
+
+
+        A_D_A = new float[Layers.Length, Layers.Max()];
+        A_D_Z = new float[Layers.Length, Layers.Max()];
+        A_D_B = new float[Layers.Length, Layers.Max()];
+        A_D_W = new float[Layers.Length, Layers.Max(), Layers.Max()];
+
+
+        LabeledData[] TrainingData = new LabeledData[1]; // ~
+        LabeledData[] MiniBatch = new LabeledData[MiniBatchSize];
+
+
+        CurrentRecordedGame = new int[boardSize, boardSize][]; //Maximum duration of game is
+        CurrentMiniBatchGameRecording = new int[boardSize, boardSize][][];
     }
 
-    void NN(float[] Input)
+    public float[] SetupNetworkInput(int[,] GameState) //prob should go into Helpers but idc ~
     {
+        return GameState.Cast<int>()
+                .Select(i => (float)i)
+                .ToArray();
+    }
+
+    public void NN(float[] Input)
+    {
+        Neuron = new float[Layers.Length, Layers.Max()]; //remove after debugging ~
         for (int i = 0; i < Layers[0]; i++)
         {
             Neuron[0, i] = Input[i];
@@ -622,52 +764,59 @@ public class AIPlayer
             for (int j = 0; j < Layers[i]; j++)
             {
                 z[i, j] = 0;
+                float result = 0;
                 for (int k = 0; k < Layers[i - 1]; k++)
                 {
-                    z[i, k] += Weight[i, j, k] * Neuron[i - 1, k];
+                    //Debug.Log("i=" + i + ",j=" + j + ",k=" + k);
+                    float w = Weight[i, j, k];
+                    float n = Neuron[i - 1, k];
+                    //Debug.Log(result + " + " + w + " * " + n + " = ");
+                    result += w * n;
+                    //z[i, j] += Weight[i, j, k] * Neuron[i - 1, k];
+                    //Debug.Log(result);
                 }
+                z[i, j] = result;
+                //Debug.Log(" +=  " + Bias[i, j] + " = ");
                 z[i, j] += Bias[i, j];
+                //Debug.Log(z[i, j]);
                 Neuron[i, j] = Helpers.Sigmoid(z[i, j]);
             }
         }
+        //Debug.Log("NN Output");
+        //Debug.Log(Neuron[Layers.Length - 1, 0]);
     }
 
-
-    int ActF(float x)
+    public float GetOutput()
     {
-        int y = Helpers.Round(x);
-        if (y < -1)
-        {
-            y = -1;
-        }
-        if (y > 1)
-        {
-            y = 1;
-        }
-        return y;
+        float Output;
+        Output = Neuron[Layers.Length - 1, 0];
+        return Output;   //only for debugging can be condensed later
     }
-
-
-    void SetupNN()
+    public void SetupNN()
     {
+        Bias = new float[Layers.Length, Layers.Max()];
+        Weight = new float[Layers.Length, Layers.Max(), Layers.Max()];
+        float rand = 0; //for debuggging, remove later... ill prob forgor
+        int num = 0;
         for (int i = 1; i < Layers.Length; i++)
         {
             for (int j = 0; j < Layers[i]; j++)
             {
-                Bias[i, j] = Random.Range(-1, 1);
-
+                rand = UnityEngine.Random.value * 2 - 1;
+                Bias[i, j] = rand;
                 for (int k = 0; k < Layers[i - 1]; k++)
                 {
-                    Weight[i, j, k] = Random.Range(-1, 1);
+                    rand = UnityEngine.Random.value * 2 - 1;
+                    Weight[i, j, k] =  rand;
+                    num++;
                 }
             }
         }
     }
 
-
-    void Backpropagation(LabeledData CurrentExample)
+    public void Backpropagation(LabeledData CurrentExample)
     {
-        float[] Output = null;
+        float[] Output = new float[Layers[Layers.Length - 1]];
         for (int i = 0; i < Layers[Layers.Length - 1]; i++)
         {
             Output[i] = Neuron[Layers.Length - 1, i];
@@ -699,7 +848,7 @@ public class AIPlayer
         }
     }
 
-    void FeedTrainingExamples()
+    public void FeedTrainingExamples()
     {
         Helpers.MakeMiniBatch(MiniBatchSize);
         for (int h = 0; h < MiniBatchSize; h++)
@@ -746,7 +895,7 @@ public class AIPlayer
     }
 
 
-    void AdjustNeuralNetwork()
+    public void AdjustNeuralNetwork()
     {
         for (int i = Layers.Length - 1; i > -1; i--)  // Step back threw Layers
         {
